@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>停车三消 - Parking Match 3</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            color: white;
+        }
+
+        .stat-item .label {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .stat-item .value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .parking-lot {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 15px;
+            position: relative;
+        }
+
+        .parking-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .parking-spot {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .parking-spot:hover:not(.exit-zone) {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .parking-spot.selected {
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+
+        .parking-spot.has-car {
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .exit-zone {
+            background: linear-gradient(135deg, rgba(255, 100, 100, 0.3), rgba(255, 150, 100, 0.3));
+            border: 2px solid rgba(255, 100, 100, 0.6);
+            border-radius: 10px;
+        }
+
+        .exit-zone-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff6b6b;
+            font-size: 0.8em;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .car {
+            width: 80%;
+            height: 80%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            cursor: grab;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            user-select: none;
+        }
+
+        .car:hover {
+            transform: scale(1.05);
+        }
+
+        .car:active {
+            cursor: grabbing;
+        }
+
+        .car-red {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            box-shadow: 0 4px 15px rgba(255, 71, 87, 0.5);
+        }
+
+        .car-blue {
+            background: linear-gradient(135deg, #3742fa, #5352ed);
+            box-shadow: 0 4px 15px rgba(55, 66, 250, 0.5);
+        }
+
+        .car-green {
+            background: linear-gradient(135deg, #2ed573, #7bed9f);
+            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.5);
+        }
+
+        .car-yellow {
+            background: linear-gradient(135deg, #ffa502, #ffcc00);
+            box-shadow: 0 4px 15px rgba(255, 165, 2, 0.5);
+        }
+
+        .car-purple {
+            background: linear-gradient(135deg, #8e44ad, #a55eea);
+            box-shadow: 0 4px 15px rgba(142, 68, 173, 0.5);
+        }
+
+        .car-icon {
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+        }
+
+        .incoming-lane {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+        }
+
+        .incoming-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .incoming-car {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3em;
+            cursor: grab;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .car-appear {
+            animation: fadeIn 0.3s ease;
+        }
+
+        .car-disappear {
+            animation: pop 0.5s ease forwards;
+        }
+
+        .match-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+            pointer-events: none;
+            z-index: 10;
+            animation: matchAnim 0.8s ease forwards;
+        }
+
+        @keyframes matchAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -100%) scale(1); }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .instructions h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .game-over-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .game-over-content h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #ff6b6b;
+        }
+
+        .game-over-content .final-score {
+            font-size: 3em;
+            color: #ffd700;
+            margin: 20px 0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .level-up {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3em;
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            z-index: 100;
+            animation: levelUpAnim 1.5s ease forwards;
+        }
+
+        @keyframes levelUpAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .combo-display {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5em;
+            color: #ffd700;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>🚗 停车三消 🚙</h1>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="label">分数</div>
+                <div class="value" id="score">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">关卡</div>
+                <div class="value" id="level">1</div>
+            </div>
+            <div class="stat-item">
+                <div class="label">目标</div>
+                <div class="value" id="target">5</div>
+            </div>
+        </div>
+
+        <div class="parking-lot" id="parkingLot">
+            <div class="parking-grid" id="parkingGrid">
+                <!-- 停车场网格将由JS生成 -->
+            </div>
+            
+            <div class="incoming-label">🚚 即将驶入的车辆</div>
+            <div class="incoming-lane" id="incomingLane">
+                <!-- 即将驶入的车辆 -->
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="newGameBtn">新游戏</button>
+            <button class="btn btn-secondary" id="hintBtn">提示</button>
+        </div>
+
+        <div class="instructions">
+            <h3>🎮 游戏说明</h3>
+            <p>1. 点击选中一辆车，再点击目标位置移动</p>
+            <p>2. 将车辆移动到<span style="color: #ff6b6b;">红色出口区域</span></p>
+            <p>3. 出口区域中<span style="color: #ffd700;">3辆同色车</span>会消除并得分</p>
+            <p>4. 停车场满了或无法移动时游戏结束</p>
+        </div>
+    </div>
+
+    <div class="game-over hidden" id="gameOver">
+        <div class="game-over-content">
+            <h2>🚦 游戏结束 🚦</h2>
+            <p>最终得分</p>
+            <div class="final-score" id="finalScore">0</div>
+            <button class="btn btn-primary" id="restartBtn">再来一局</button>
+        </div>
+    </div>
+
+    <div class="combo-display hidden" id="comboDisplay"></div>
+
+    <script>
+        // 游戏配置
+        const CONFIG = {
+            GRID_ROWS: 5,
+            GRID_COLS: 6,
+            EXIT_ZONES: [24, 25, 26, 27, 28, 29], // 最后一行作为出口区域
+            COLORS: ['red', 'blue', 'green', 'yellow', 'purple'],
+            CAR_ICONS: {
+                red: '🚗',
+                blue: '🚙',
+                green: '🚕',
+                yellow: '🚓',
+                purple: '🚐'
+            },
+            INITIAL_CARS: 8,
+            INCOMING_COUNT: 3,
+            MATCH_COUNT: 3,
+            BASE_SCORE: 100,
+            COMBO_MULTIPLIER: 1.5,
+            LEVEL_UP_SCORE: 500,
+            TARGET_BASE: 5
+        };
+
+        // 游戏状态
+        let gameState = {
+            grid: [],
+            score: 0,
+            level: 1,
+            target: 5,
+            matches: 0,
+            selectedCar: null,
+            selectedSpot: null,
+            incomingCars: [],
+            gameOver: false,
+            combo: 0
+        };
+
+        // DOM 元素
+        const elements = {
+            parkingGrid: document.getElementById('parkingGrid'),
+            incomingLane: document.getElementById('incomingLane'),
+            score: document.getElementById('score'),
+            level: document.getElementById('level'),
+            target: document.getElementById('target'),
+            gameOver: document.getElementById('gameOver'),
+            finalScore: document.getElementById('finalScore'),
+            newGameBtn: document.getElementById('newGameBtn'),
+            restartBtn: document.getElementById('restartBtn'),
+            hintBtn: document.getElementById('hintBtn'),
+            comboDisplay: document.getElementById('comboDisplay')
+        };
+
+        // 初始化游戏
+        function initGame() {
+            gameState = {
+                grid: [],
+                score: 0,
+                level: 1,
+                target: CONFIG.TARGET_BASE,
+                matches: 0,
+                selectedCar: null,
+                selectedSpot: null,
+                incomingCars: [],
+                gameOver: false,
+                combo: 0
+            };
+
+            // 初始化网格
+            for (let i = 0; i < CONFIG.GRID_ROWS * CONFIG.GRID_COLS; i++) {
+                gameState.grid.push(null);
+            }
+
+            // 放置初始车辆
+            placeInitialCars();
+            
+            // 生成即将驶入的车辆
+            generateIncomingCars();
+            
+            // 渲染
+            render();
+            updateStats();
+            
+            // 隐藏游戏结束画面
+            elements.gameOver.classList.add('hidden');
+        }
+
+        // 放置初始车辆
+        function placeInitialCars() {
+            const availableSpots = [];
+            for (let i = 0; i < gameState.grid.length; i++) {
+                if (!CONFIG.EXIT_ZONES.includes(i)) {
+                    availableSpots.push(i);
+                }
+            }
+
+            // 随机选择位置放置车辆
+            for (let i = 0; i < CONFIG.INITIAL_CARS && availableSpots.length > 0; i++) {
+                const randomIndex = Math.floor(Math.random() * availableSpots.length);
+                const spotIndex = availableSpots.splice(randomIndex, 1)[0];
+                const color = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+                gameState.grid[spotIndex] = color;
+            }
+        }
+
+        // 生成即将驶入的车辆
+        function generateIncomingCars() {
+            gameState.incomingCars = [];
+            for (let i = 0; i < CONFIG.INCOMING_COUNT; i++) {
+                const color = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+                gameState.incomingCars.push(color);
+            }
+        }
+
+        // 渲染游戏
+        function render() {
+            renderParkingGrid();
+            renderIncomingLane();
+        }
+
+        // 渲染停车场网格
+        function renderParkingGrid() {
+            elements.parkingGrid.innerHTML = '';
+
+            for (let i = 0; i < gameState.grid.length; i++) {
+                const spot = document.createElement('div');
+                spot.className = 'parking-spot';
+                spot.dataset.index = i;
+
+                // 检查是否是出口区域
+                if (CONFIG.EXIT_ZONES.includes(i)) {
+                    spot.classList.add('exit-zone');
+                    if (i === CONFIG.EXIT_ZONES[Math.floor(CONFIG.EXIT_ZONES.length / 2)]) {
+                        const label = document.createElement('div');
+                        label.className = 'exit-zone-label';
+                        label.textContent = '⬆️ 出口区域 ⬆️';
+                        spot.appendChild(label);
+                    }
+                }
+
+                // 检查是否有车辆
+                if (gameState.grid[i]) {
+                    spot.classList.add('has-car');
+                    const car = document.createElement('div');
+                    car.className = `car car-${gameState.grid[i]} car-appear`;
+                    car.innerHTML = `<span class="car-icon">${CONFIG.CAR_ICONS[gameState.grid[i]]}</span>`;
+                    spot.appendChild(car);
+                }
+
+                // 检查是否被选中
+                if (gameState.selectedSpot === i) {
+                    spot.classList.add('selected');
+                }
+
+                // 添加点击事件
+                spot.addEventListener('click', () => handleSpotClick(i));
+
+                elements.parkingGrid.appendChild(spot);
+            }
+        }
+
+        // 渲染即将驶入的车道
+        function renderIncomingLane() {
+            elements.incomingLane.innerHTML = '';
+
+            gameState.incomingCars.forEach((color, index) => {
+                const car = document.createElement('div');
+                car.className = `incoming-car car-${color}`;
+                car.innerHTML = `<span class="car-icon">${CONFIG.CAR_ICONS[color]}</span>`;
+                car.dataset.index = index;
+                car.addEventListener('click', () => handleIncomingCarClick(index));
+                elements.incomingLane.appendChild(car);
+            });
+        }
+
+        // 处理停车位点击
+        function handleSpotClick(index) {
+            if (gameState.gameOver) return;
+
+            const hasCar = gameState.grid[index] !== null;
+            const isExitZone = CONFIG.EXIT_ZONES.includes(index);
+
+            // 如果已经选中了一辆车
+            if (gameState.selectedSpot !== null) {
+                // 点击的是自己 - 取消选中
+                if (gameState.selectedSpot === index) {
+                    gameState.selectedSpot = null;
+                    render();
+                    return;
+                }
+
+                // 点击的是其他有车的位置 - 切换选中
+                if (hasCar) {
+                    gameState.selectedSpot = index;
+                    render();
+                    return;
+                }
+
+                // 点击的是空位置 - 尝试移动
+                if (tryMoveCar(gameState.selectedSpot, index)) {
+                    gameState.selectedSpot = null;
+                }
+                return;
+            }
+
+            // 没有选中车辆，点击了有车的位置 - 选中
+            if (hasCar) {
+                gameState.selectedSpot = index;
+                render();
+            }
+        }
+
+        // 处理即将驶入的车辆点击
+        function handleIncomingCarClick(index) {
+            if (gameState.gameOver) return;
+
+            // 找到空的停车位（非出口区域）
+            const emptySpots = [];
+            for (let i = 0; i < gameState.grid.length; i++) {
+                if (gameState.grid[i] === null && !CONFIG.EXIT_ZONES.includes(i)) {
+                    emptySpots.push(i);
+                }
+            }
+
+            if (emptySpots.length === 0) {
+                showGameOver();
+                return;
+            }
+
+            // 提示用户选择一个空位置
+            if (gameState.selectedSpot === null) {
+                // 标记即将驶入的车辆为"待放置"状态
+                // 这里简化处理：直接随机选择位置
+                const randomSpot = emptySpots[Math.floor(Math.random() * emptySpots.length)];
+                const color = gameState.incomingCars[index];
+                gameState.grid[randomSpot] = color;
+                
+                // 移除即将驶入的车辆
+                gameState.incomingCars.splice(index, 1);
+                
+                // 补充新的即将驶入的车辆
+                if (gameState.incomingCars.length < CONFIG.INCOMING_COUNT) {
+                    const newColor = CONFIG.COLORS[Math.floor(Math.random() * CONFIG.COLORS.length)];
+                    gameState.incomingCars.push(newColor);
+                }
+
+                render();
+                checkGameOver();
+            }
+        }
+
+        // 尝试移动车辆
+        function tryMoveCar(fromIndex, toIndex) {
+            const fromColor = gameState.grid[fromIndex];
+            const toColor = gameState.grid[toIndex];
+
+            // 目标位置必须为空
+            if (toColor !== null) return false;
+
+            // 检查是否可以移动（简化版：只要路径上没有其他车？不，简化为可以直接移动到任何空位）
+            // 简化版本：允许直接移动到任何空位
+
+            // 移动车辆
+            gameState.grid[fromIndex] = null;
+            gameState.grid[toIndex] = fromColor;
+
+            render();
+
+            // 检查出口区域是否有匹配
+            setTimeout(() => checkMatches(), 300);
+
+            return true;
+        }
+
+        // 检查匹配
+        function checkMatches() {
+            const exitZoneCars = {};
+            const exitZoneIndices = [];
+
+            // 统计出口区域的车辆
+            CONFIG.EXIT_ZONES.forEach(index => {
+                const color = gameState.grid[index];
+                if (color) {
+                    if (!exitZoneCars[color]) {
+                        exitZoneCars[color] = [];
+                    }
+                    exitZoneCars[color].push(index);
+                    exitZoneIndices.push(index);
+                }
+            });
+
+            let hasMatch = false;
+
+            // 检查每种颜色是否有3辆或更多
+            for (const color in exitZoneCars) {
+                if (exitZoneCars[color].length >= CONFIG.MATCH_COUNT) {
+                    hasMatch = true;
+                    gameState.combo++;
+
+                    // 计算分数
+                    const points = Math.floor(CONFIG.BASE_SCORE * gameState.level * 
+                        Math.pow(CONFIG.COMBO_MULTIPLIER, gameState.combo - 1));
+                    gameState.score += points;
+                    gameState.matches++;
+
+                    // 显示连击
+                    if (gameState.combo > 1) {
+                        showCombo();
+                    }
+
+                    // 显示消除动画
+                    const indicesToRemove = exitZoneCars[color].slice(0, CONFIG.MATCH_COUNT);
+                    indicesToRemove.forEach(index => {
+                        const spot = elements.parkingGrid.children[index];
+                        const car = spot.querySelector('.car');
+                        if (car) {
+                            car.classList.remove('car-appear');
+                            car.classList.add('car-disappear');
+                            
+                            // 显示匹配指示器
+                            const indicator = document.createElement('div');
+                            indicator.className = 'match-indicator';
+                            indicator.textContent = `+${points}`;
+                            spot.appendChild(indicator);
+                        }
+                    });
+
+                    // 移除车辆
+                    setTimeout(() => {
+                        indicesToRemove.forEach(index => {
+                            gameState.grid[index] = null;
+                        });
+                        
+                        // 检查是否升级
+                        checkLevelUp();
+                        
+                        render();
+                        updateStats();
+                        
+                        // 重置连击（如果没有更多匹配）
+                        setTimeout(() => {
+                            if (!hasMoreMatches()) {
+                                gameState.combo = 0;
+                                elements.comboDisplay.classList.add('hidden');
+                            }
+                            checkGameOver();
+                        }, 500);
+                    }, 500);
+
+                    break; // 一次只处理一个匹配
+                }
+            }
+
+            if (!hasMatch) {
+                gameState.combo = 0;
+                elements.comboDisplay.classList.add('hidden');
+                checkGameOver();
+            }
+        }
+
+        // 检查是否还有更多匹配
+        function hasMoreMatches() {
+            const exitZoneCars = {};
+            CONFIG.EXIT_ZONES.forEach(index => {
+                const color = gameState.grid[index];
+                if (color) {
+                    if (!exitZoneCars[color]) {
+                        exitZoneCars[color] = [];
+                    }
+                    exitZoneCars[color].push(index);
+                }
+            });
+
+            for (const color in exitZoneCars) {
+                if (exitZoneCars[color].length >= CONFIG.MATCH_COUNT) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 显示连击
+        function showCombo() {
+            elements.comboDisplay.textContent = `🔥 ${gameState.combo}连击!`;
+            elements.comboDisplay.classList.remove('hidden');
+        }
+
+        // 检查升级
+        function checkLevelUp() {
+            const newLevel = Math.floor(gameState.score / CONFIG.LEVEL_UP_SCORE) + 1;
+            if (newLevel > gameState.level) {
+                gameState.level = newLevel;
+                gameState.target = CONFIG.TARGET_BASE + (gameState.level - 1) * 2;
+                
+                // 显示升级动画
+                const levelUpDiv = document.createElement('div');
+                levelUpDiv.className = 'level-up';
+                levelUpDiv.textContent = `🎉 关卡 ${gameState.level}!`;
+                document.body.appendChild(levelUpDiv);
+                
+                setTimeout(() => {
+                    levelUpDiv.remove();
+                }, 1500);
+            }
+        }
+
+        // 检查游戏结束
+        function checkGameOver() {
+            // 检查是否有可用的移动
+            let hasValidMove = false;
+
+            // 检查是否有空位可以移动车辆
+            for (let i = 0; i < gameState.grid.length; i++) {
+                if (gameState.grid[i] !== null) {
+                    // 检查是否有空位可以移动到
+                    for (let j = 0; j < gameState.grid.length; j++) {
+                        if (gameState.grid[j] === null) {
+                            hasValidMove = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasValidMove) break;
+            }
+
+            // 检查是否有即将驶入的车辆可以放置
+            const hasEmptySpotsForIncoming = gameState.grid.some((spot, index) => 
+                spot === null && !CONFIG.EXIT_ZONES.includes(index)
+            );
+
+            if (!hasValidMove && !hasEmptySpotsForIncoming) {
+                showGameOver();
+            }
+        }
+
+        // 显示游戏结束
+        function showGameOver() {
+            gameState.gameOver = true;
+            elements.finalScore.textContent = gameState.score;
+            elements.gameOver.classList.remove('hidden');
+        }
+
+        // 更新统计
+        function updateStats() {
+            elements.score.textContent = gameState.score;
+            elements.level.textContent = gameState.level;
+            elements.target.textContent = gameState.target;
+        }
+
+        // 提示功能
+        function showHint() {
+            // 简单的提示：找到一个可以移动到出口区域的车辆
+            for (let i = 0; i < gameState.grid.length; i++) {
+                if (gameState.grid[i] !== null && !CONFIG.EXIT_ZONES.includes(i)) {
+                    const color = gameState.grid[i];
+                    
+                    // 检查出口区域是否有相同颜色的车
+                    let sameColorInExit = 0;
+                    CONFIG.EXIT_ZONES.forEach(index => {
+                        if (gameState.grid[index] === color) {
+                            sameColorInExit++;
+                        }
+                    });
+
+                    // 如果出口区域已有1-2辆同色车，这是一个好的移动
+                    if (sameColorInExit >= 1 && sameColorInExit < CONFIG.MATCH_COUNT) {
+                        // 高亮这个车辆
+                        gameState.selectedSpot = i;
+                        render();
+                        
+                        // 3秒后取消高亮
+                        setTimeout(() => {
+                            gameState.selectedSpot = null;
+                            render();
+                        }, 3000);
+                        
+                        return;
+                    }
+                }
+            }
+
+            // 如果没有找到好的移动，随机选择一个有车的位置
+            for (let i = 0; i < gameState.grid.length; i++) {
+                if (gameState.grid[i] !== null && !CONFIG.EXIT_ZONES.includes(i)) {
+                    gameState.selectedSpot = i;
+                    render();
+                    setTimeout(() => {
+                        gameState.selectedSpot = null;
+                        render();
+                    }, 3000);
+                    return;
+                }
+            }
+        }
+
+        // 事件监听
+        elements.newGameBtn.addEventListener('click', initGame);
+        elements.restartBtn.addEventListener('click', initGame);
+        elements.hintBtn.addEventListener('click', showHint);
+
+        // 启动游戏
+        initGame();
+    </script>
+</body>
+</html>
